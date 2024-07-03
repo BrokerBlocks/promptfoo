@@ -230,7 +230,7 @@ export async function startServer(
   app.use(express.static(staticDir));
 
   httpServer.listen(port, () => {
-    const url = `http://localhost:${port}`;
+    const url = `http://127.0.0.1:${port}`;
     logger.info(`Server running at ${url} and monitoring for new evals.`);
 
     const openUrl = async () => {

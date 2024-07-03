@@ -29,7 +29,7 @@ class LocalAiGenericProvider implements ApiProvider {
       config?.apiBaseUrl ||
       env?.LOCALAI_BASE_URL ||
       process.env.LOCALAI_BASE_URL ||
-      'http://localhost:8080/v1';
+      'http://127.0.0.1:8080/v1';
     this.config = config || {};
     this.id = id ? () => id : this.id;
   }

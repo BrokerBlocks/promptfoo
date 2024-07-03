@@ -155,7 +155,7 @@ export class OllamaCompletionProvider implements ApiProvider {
     let response;
     try {
       response = await fetchWithCache(
-        `${process.env.OLLAMA_BASE_URL || 'http://localhost:11434'}/api/generate`,
+        `${process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434'}/api/generate`,
         {
           method: 'POST',
           headers: {
@@ -249,7 +249,7 @@ export class OllamaChatProvider implements ApiProvider {
     let response;
     try {
       response = await fetchWithCache(
-        `${process.env.OLLAMA_BASE_URL || 'http://localhost:11434'}/api/chat`,
+        `${process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434'}/api/chat`,
         {
           method: 'POST',
           headers: {
@@ -311,7 +311,7 @@ export class OllamaEmbeddingProvider extends OllamaCompletionProvider {
     let response;
     try {
       response = await fetchWithCache(
-        `${process.env.OLLAMA_BASE_URL || 'http://localhost:11434'}/api/embeddings`,
+        `${process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434'}/api/embeddings`,
         {
           method: 'POST',
           headers: {

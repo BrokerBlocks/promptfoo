@@ -67,7 +67,7 @@ export class LlamaProvider implements ApiProvider {
     let response;
     try {
       response = await fetchWithCache(
-        `${process.env.LLAMA_BASE_URL || 'http://localhost:8080'}/completion`,
+        `${process.env.LLAMA_BASE_URL || 'http://127.0.0.1:8080'}/completion`,
         {
           method: 'POST',
           headers: {

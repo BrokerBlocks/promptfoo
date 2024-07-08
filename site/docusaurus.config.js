@@ -19,11 +19,11 @@ const config = {
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'typpo', // Usually your GitHub org/user name.
+  organizationName: 'promptfoo', // Usually your GitHub org/user name.
   projectName: 'promptfoo', // Usually your repo name.
 
   onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
+  onBrokenMarkdownLinks: 'throw',
 
   // Even if you don't use internalization, you can use this field to set useful
   // metadata like html lang. For example, if your site is Chinese, you may want
@@ -32,6 +32,31 @@ const config = {
     defaultLocale: 'en',
     locales: ['en'],
   },
+
+  headTags: [
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'preconnect',
+        href: 'https://fonts.googleapis.com',
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'preconnect',
+        href: 'https://fonts.gstatic.com',
+        crossorigin: 'true',
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'stylesheet',
+        href: 'https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap',
+      },
+    },
+  ],
 
   presets: [
     [
@@ -44,15 +69,14 @@ const config = {
           editUrl: 'https://github.com/promptfoo/promptfoo/tree/main/site',
           sidebarCollapsed: false,
         },
-        /*
         blog: {
-          showReadingTime: true,
+          showReadingTime: false,
+          blogSidebarCount: 0,
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
+          //editUrl:
+          //  'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
         },
-        */
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
         },
@@ -83,9 +107,24 @@ const config = {
             label: 'Tutorial',
           },
           */
-          { to: '/docs/intro', label: 'Docs', position: 'right' },
+          { to: '/docs/intro', label: 'Docs', position: 'left' },
           {
-            href: 'https://github.com/typpo/promptfoo',
+            to: '/llm-vulnerability-scanner',
+            label: 'LLM Vulnerability Scanner',
+            position: 'left',
+          },
+          {
+            to: '/docs/red-team',
+            label: 'LLM Red Teaming',
+            position: 'left',
+          },
+          {
+            href: '/blog',
+            label: 'Blog',
+            position: 'left',
+          },
+          {
+            href: 'https://github.com/promptfoo/promptfoo',
             label: 'GitHub',
             position: 'right',
           },
@@ -139,6 +178,10 @@ const config = {
                 label: 'Minimizing hallucinations',
                 to: '/docs/guides/prevent-llm-hallucations',
               },
+              {
+                label: 'LLM red teaming',
+                to: '/docs/red-team',
+              },
             ],
           },
           {
@@ -146,11 +189,19 @@ const config = {
             items: [
               {
                 label: 'GitHub',
-                href: 'https://github.com/typpo/promptfoo',
+                href: 'https://github.com/promptfoo/promptfoo',
               },
               {
                 label: 'Discord',
                 href: 'https://discord.gg/gHPS9jjfbs',
+              },
+              {
+                label: 'Blog',
+                href: '/blog',
+              },
+              {
+                label: 'Contact Us',
+                href: 'mailto:inquiries@promptfoo.dev',
               },
             ],
           },
@@ -172,7 +223,7 @@ const config = {
         ],
       },
       zoom: {
-        selector: '.markdown :not(em) > img',
+        selector: '.markdown :not(em) > img:not(.no-zoom)',
       },
       algolia: {
         // The application ID provided by Algolia

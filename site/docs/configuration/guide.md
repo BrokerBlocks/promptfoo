@@ -119,6 +119,10 @@ Or a list of paths:
 tests: ['tests/accuracy', 'tests/creativity', 'tests/hallucination']
 ```
 
+:::tip
+We also support CSV datasets from [local file](/docs/configuration/parameters/#import-from-csv) and [Google Sheets](/docs/integrations/google-sheets).
+:::
+
 ## Import vars from separate files
 
 The `vars` attribute can point to a file or directory. For example:
@@ -258,22 +262,22 @@ tests:
       language: French
       input: Hello world
     assert:
-      - $ref: '#assertionTemplates/startsUpperCase'
+      - $ref: '#/assertionTemplates/startsUpperCase'
   - vars:
       language: German
       input: How's it going?
     assert:
-      - $ref: '#assertionTemplates/noAIreference'
-      - $ref: '#assertionTemplates/startsUpperCase'
+      - $ref: '#/assertionTemplates/noAIreference'
+      - $ref: '#/assertionTemplates/startsUpperCase'
 
 // highlight-start
 assertionTemplates:
     noAIreference:
-      - type: llm-rubric
-        value: does not describe self as an AI, model, or chatbot
+      type: llm-rubric
+      value: does not describe self as an AI, model, or chatbot
     startsUpperCase:
-      - type: javascript
-        value: output[0] === output[0].toUpperCase()
+      type: javascript
+      value: output[0] === output[0].toUpperCase()
 // highlight-end
 ```
 
@@ -344,7 +348,7 @@ tests:
 
 prompt.txt:
 
-```
+```liquid
 User Profile:
 - Name: {{ user_profile.name }}
 - Interests: {{ user_profile.interests | join(', ') }}
@@ -438,11 +442,9 @@ tests:
       topic: 'theoretical quantum physics in alternate dimensions'
 ```
 
-## Tools and functions
+## Tools and Functions
 
-promptfoo supports OpenAI tools, functions, and other provider-specific configurations like temperature, number of tokens, and so on.
-
-To use, override the `config` key of the provider. See example [here](/docs/providers/openai#using-tools).
+promptfoo supports tool use and function calling with OpenAI and Anthropic models, as well as other provider-specific configurations like temperature and number of tokens. For more information on defining functions and tools, see the [OpenAI provider docs](/docs/providers/openai#using-tools) and the [Anthropic provider docs](/docs/providers/anthropic#tool-use).
 
 ## Transforming outputs
 
@@ -450,7 +452,7 @@ The `TestCase.options.transform` field is a Javascript snippet that modifies the
 
 It is a function that takes a string output and a context object:
 
-```
+```typescript
 transformFn: (output: string, context: {
   prompt: {
     // ID of the prompt, if assigned

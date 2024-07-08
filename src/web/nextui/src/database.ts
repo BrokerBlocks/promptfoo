@@ -1,9 +1,6 @@
-import { NIL as NULL_UUID } from 'uuid';
-
 import { EvaluateSummary, EvaluateTestSuite } from '@/../../../types';
-
-import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type SupabaseEvaluationJob = Database['public']['Tables']['EvaluationJob']['Row'];
 export type SupabaseEvaluationResult = Database['public']['Tables']['EvaluationResult']['Row'];

@@ -1,31 +1,17 @@
+import child_process from 'child_process';
 import * as fs from 'fs';
 import fetch from 'node-fetch';
-import child_process from 'child_process';
+import * as path from 'path';
 import Stream from 'stream';
-
-import { AwsBedrockCompletionProvider } from '../src/providers/bedrock';
-import {
-  OpenAiAssistantProvider,
-  OpenAiCompletionProvider,
-  OpenAiChatCompletionProvider,
-} from '../src/providers/openai';
-import { AnthropicCompletionProvider } from '../src/providers/anthropic';
-import { LlamaProvider } from '../src/providers/llama';
-
 import { clearCache, disableCache, enableCache } from '../src/cache';
+import { importModule } from '../src/esm';
 import { loadApiProvider, loadApiProviders } from '../src/providers';
+import { AnthropicCompletionProvider } from '../src/providers/anthropic';
 import {
   AzureOpenAiChatCompletionProvider,
   AzureOpenAiCompletionProvider,
 } from '../src/providers/azureopenai';
-import { OllamaChatProvider, OllamaCompletionProvider } from '../src/providers/ollama';
-import { WebhookProvider } from '../src/providers/webhook';
-import {
-  HuggingfaceTextGenerationProvider,
-  HuggingfaceFeatureExtractionProvider,
-  HuggingfaceTextClassificationProvider,
-} from '../src/providers/huggingface';
-import { ScriptCompletionProvider } from '../src/providers/scriptCompletion';
+import { AwsBedrockCompletionProvider } from '../src/providers/bedrock';
 import {
   CloudflareAiChatCompletionProvider,
   CloudflareAiCompletionProvider,
@@ -35,7 +21,27 @@ import {
   type ICloudflareEmbeddingResponse,
   type ICloudflareProviderConfig,
 } from '../src/providers/cloudflare-ai';
-
+import {
+  HuggingfaceTextGenerationProvider,
+  HuggingfaceFeatureExtractionProvider,
+  HuggingfaceTextClassificationProvider,
+} from '../src/providers/huggingface';
+import { LlamaProvider } from '../src/providers/llama';
+import { OllamaChatProvider, OllamaCompletionProvider } from '../src/providers/ollama';
+import {
+  OpenAiAssistantProvider,
+  OpenAiCompletionProvider,
+  OpenAiChatCompletionProvider,
+} from '../src/providers/openai';
+import {
+  ReplicateImageProvider,
+  ReplicateModerationProvider,
+  ReplicateProvider,
+} from '../src/providers/replicate';
+import { ScriptCompletionProvider } from '../src/providers/scriptCompletion';
+import { VertexChatProvider, VertexEmbeddingProvider } from '../src/providers/vertex';
+import { VoyageEmbeddingProvider } from '../src/providers/voyage';
+import { WebhookProvider } from '../src/providers/webhook';
 import type { ProviderOptionsMap, ProviderFunction } from '../src/types';
 
 jest.mock('fs', () => ({
@@ -59,7 +65,10 @@ jest.mock('proxy-agent', () => ({
   ProxyAgent: jest.fn().mockImplementation(() => ({})),
 }));
 
-jest.mock('../src/esm');
+jest.mock('../src/esm', () => ({
+  ...jest.requireActual('../src/esm'),
+  importModule: jest.fn(),
+}));
 
 jest.mock('fs', () => ({
   readFileSync: jest.fn(),
@@ -79,7 +88,7 @@ describe('call provider apis', () => {
     await clearCache();
   });
 
-  test('OpenAiCompletionProvider callApi', async () => {
+  it('OpenAiCompletionProvider callApi', async () => {
     const mockResponse = {
       text: jest.fn().mockResolvedValue(
         JSON.stringify({
@@ -88,7 +97,7 @@ describe('call provider apis', () => {
         }),
       ),
     };
-    (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+    jest.mocked(fetch).mockResolvedValue(mockResponse);
 
     const provider = new OpenAiCompletionProvider('text-davinci-003');
     const result = await provider.callApi('Test prompt');
@@ -98,7 +107,7 @@ describe('call provider apis', () => {
     expect(result.tokenUsage).toEqual({ total: 10, prompt: 5, completion: 5 });
   });
 
-  test('OpenAiChatCompletionProvider callApi', async () => {
+  it('OpenAiChatCompletionProvider callApi', async () => {
     const mockResponse = {
       text: jest.fn().mockResolvedValue(
         JSON.stringify({
@@ -108,7 +117,7 @@ describe('call provider apis', () => {
       ),
       ok: true,
     };
-    (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+    jest.mocked(fetch).mockResolvedValue(mockResponse);
 
     const provider = new OpenAiChatCompletionProvider('gpt-3.5-turbo');
     const result = await provider.callApi(
@@ -120,7 +129,7 @@ describe('call provider apis', () => {
     expect(result.tokenUsage).toEqual({ total: 10, prompt: 5, completion: 5 });
   });
 
-  test('OpenAiChatCompletionProvider callApi with caching', async () => {
+  it('OpenAiChatCompletionProvider callApi with caching', async () => {
     const mockResponse = {
       text: jest.fn().mockResolvedValue(
         JSON.stringify({
@@ -130,7 +139,7 @@ describe('call provider apis', () => {
       ),
       ok: true,
     };
-    (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+    jest.mocked(fetch).mockResolvedValue(mockResponse);
 
     const provider = new OpenAiChatCompletionProvider('gpt-3.5-turbo');
     const result = await provider.callApi(
@@ -150,7 +159,7 @@ describe('call provider apis', () => {
     expect(result2.tokenUsage).toEqual({ total: 10, cached: 10 });
   });
 
-  test('OpenAiChatCompletionProvider callApi with cache disabled', async () => {
+  it('OpenAiChatCompletionProvider callApi with cache disabled', async () => {
     const mockResponse = {
       text: jest.fn().mockResolvedValue(
         JSON.stringify({
@@ -160,7 +169,7 @@ describe('call provider apis', () => {
       ),
       ok: true,
     };
-    (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+    jest.mocked(fetch).mockResolvedValue(mockResponse);
 
     const provider = new OpenAiChatCompletionProvider('gpt-3.5-turbo');
     const result = await provider.callApi(
@@ -184,7 +193,7 @@ describe('call provider apis', () => {
     enableCache();
   });
 
-  test('OpenAiChatCompletionProvider constructor with config', async () => {
+  it('OpenAiChatCompletionProvider constructor with config', async () => {
     const config = {
       temperature: 3.1415926,
       max_tokens: 201,
@@ -203,7 +212,7 @@ describe('call provider apis', () => {
     expect(provider.config.max_tokens).toBe(config.max_tokens);
   });
 
-  test('AzureOpenAiCompletionProvider callApi', async () => {
+  it('AzureOpenAiCompletionProvider callApi', async () => {
     const mockResponse = {
       text: jest.fn().mockResolvedValue(
         JSON.stringify({
@@ -212,7 +221,7 @@ describe('call provider apis', () => {
         }),
       ),
     };
-    (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+    jest.mocked(fetch).mockResolvedValue(mockResponse);
 
     const provider = new AzureOpenAiCompletionProvider('text-davinci-003');
     const result = await provider.callApi('Test prompt');
@@ -222,7 +231,7 @@ describe('call provider apis', () => {
     expect(result.tokenUsage).toEqual({ total: 10, prompt: 5, completion: 5 });
   });
 
-  test('AzureOpenAiChatCompletionProvider callApi', async () => {
+  it('AzureOpenAiChatCompletionProvider callApi', async () => {
     const mockResponse = {
       text: jest.fn().mockResolvedValue(
         JSON.stringify({
@@ -231,7 +240,7 @@ describe('call provider apis', () => {
         }),
       ),
     };
-    (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+    jest.mocked(fetch).mockResolvedValue(mockResponse);
 
     const provider = new AzureOpenAiChatCompletionProvider('gpt-3.5-turbo');
     const result = await provider.callApi(
@@ -243,7 +252,7 @@ describe('call provider apis', () => {
     expect(result.tokenUsage).toEqual({ total: 10, prompt: 5, completion: 5 });
   });
 
-  test('AzureOpenAiChatCompletionProvider callApi with dataSources', async () => {
+  it('AzureOpenAiChatCompletionProvider callApi with dataSources', async () => {
     const dataSources = [
       {
         type: 'AzureCognitiveSearch',
@@ -265,7 +274,7 @@ describe('call provider apis', () => {
         }),
       ),
     };
-    (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+    jest.mocked(fetch).mockResolvedValue(mockResponse);
 
     const provider = new AzureOpenAiChatCompletionProvider('gpt-3.5-turbo', {
       config: { dataSources },
@@ -282,7 +291,7 @@ describe('call provider apis', () => {
     expect(result.tokenUsage).toEqual({ total: 10, prompt: 5, completion: 5 });
   });
 
-  test('AzureOpenAiChatCompletionProvider callApi with cache disabled', async () => {
+  it('AzureOpenAiChatCompletionProvider callApi with cache disabled', async () => {
     disableCache();
 
     const mockResponse = {
@@ -293,7 +302,7 @@ describe('call provider apis', () => {
         }),
       ),
     };
-    (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+    jest.mocked(fetch).mockResolvedValue(mockResponse);
 
     const provider = new AzureOpenAiChatCompletionProvider('gpt-3.5-turbo');
     const result = await provider.callApi(
@@ -307,60 +316,7 @@ describe('call provider apis', () => {
     enableCache();
   });
 
-  test('AnthropicCompletionProvider callApi', async () => {
-    const provider = new AnthropicCompletionProvider('claude-1');
-    provider.anthropic.completions.create = jest.fn().mockResolvedValue({
-      completion: 'Test output',
-    });
-    const result = await provider.callApi('Test prompt');
-
-    expect(provider.anthropic.completions.create).toHaveBeenCalledTimes(1);
-    expect(result.output).toBe('Test output');
-    expect(result.tokenUsage).toEqual({});
-  });
-
-  test('AnthropicCompletionProvider callApi with caching', async () => {
-    const provider = new AnthropicCompletionProvider('claude-1');
-    provider.anthropic.completions.create = jest.fn().mockResolvedValue({
-      completion: 'Test output',
-    });
-    const result = await provider.callApi('Test prompt');
-
-    expect(provider.anthropic.completions.create).toHaveBeenCalledTimes(1);
-    expect(result.output).toBe('Test output');
-    expect(result.tokenUsage).toEqual({});
-
-    (provider.anthropic.completions.create as jest.Mock).mockClear();
-    const result2 = await provider.callApi('Test prompt');
-
-    expect(provider.anthropic.completions.create).toHaveBeenCalledTimes(0);
-    expect(result2.output).toBe('Test output');
-    expect(result2.tokenUsage).toEqual({});
-  });
-
-  test('AnthropicCompletionProvider callApi with caching disabled', async () => {
-    const provider = new AnthropicCompletionProvider('claude-1');
-    provider.anthropic.completions.create = jest.fn().mockResolvedValue({
-      completion: 'Test output',
-    });
-    const result = await provider.callApi('Test prompt');
-
-    expect(provider.anthropic.completions.create).toHaveBeenCalledTimes(1);
-    expect(result.output).toBe('Test output');
-    expect(result.tokenUsage).toEqual({});
-
-    (provider.anthropic.completions.create as jest.Mock).mockClear();
-
-    disableCache();
-
-    const result2 = await provider.callApi('Test prompt');
-
-    expect(provider.anthropic.completions.create).toHaveBeenCalledTimes(1);
-    expect(result2.output).toBe('Test output');
-    expect(result2.tokenUsage).toEqual({});
-  });
-
-  test('LlamaProvider callApi', async () => {
+  it('LlamaProvider callApi', async () => {
     const mockResponse = {
       text: jest.fn().mockResolvedValue(
         JSON.stringify({
@@ -368,7 +324,7 @@ describe('call provider apis', () => {
         }),
       ),
     };
-    (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+    jest.mocked(fetch).mockResolvedValue(mockResponse);
 
     const provider = new LlamaProvider('llama.cpp');
     const result = await provider.callApi('Test prompt');
@@ -377,7 +333,7 @@ describe('call provider apis', () => {
     expect(result.output).toBe('Test output');
   });
 
-  test('OllamaCompletionProvider callApi', async () => {
+  it('OllamaCompletionProvider callApi', async () => {
     const mockResponse = {
       text: jest.fn()
         .mockResolvedValue(`{"model":"llama2:13b","created_at":"2023-08-08T21:50:34.898068Z","response":"Gre","done":false}
@@ -390,7 +346,7 @@ describe('call provider apis', () => {
 {"model":"llama2:13b","created_at":"2023-08-08T21:50:35.117166Z","response":" blue","done":false}
 {"model":"llama2:13b","created_at":"2023-08-08T21:50:41.695299Z","done":true,"context":[1,29871,1,13,9314],"total_duration":10411943458,"load_duration":458333,"sample_count":217,"sample_duration":154566000,"prompt_eval_count":11,"prompt_eval_duration":3334582000,"eval_count":216,"eval_duration":6905134000}`),
     };
-    (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+    jest.mocked(fetch).mockResolvedValue(mockResponse);
 
     const provider = new OllamaCompletionProvider('llama');
     const result = await provider.callApi('Test prompt');
@@ -399,7 +355,7 @@ describe('call provider apis', () => {
     expect(result.output).toBe('Great question! The sky appears blue');
   });
 
-  test('OllamaChatProvider callApi', async () => {
+  it('OllamaChatProvider callApi', async () => {
     const mockResponse = {
       text: jest.fn()
         .mockResolvedValue(`{"model":"orca-mini","created_at":"2023-12-16T01:46:19.263682972Z","message":{"role":"assistant","content":" Because","images":null},"done":false}
@@ -410,7 +366,7 @@ describe('call provider apis', () => {
 {"model":"orca-mini","created_at":"2023-12-16T01:46:19.324309782Z","message":{"role":"assistant","content":".","images":null},"done":false}
 {"model":"orca-mini","created_at":"2023-12-16T01:46:19.337165395Z","done":true,"total_duration":1486443841,"load_duration":1280794143,"prompt_eval_count":35,"prompt_eval_duration":142384000,"eval_count":6,"eval_duration":61912000}`),
     };
-    (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+    jest.mocked(fetch).mockResolvedValue(mockResponse);
 
     const provider = new OllamaChatProvider('llama');
     const result = await provider.callApi('Test prompt');
@@ -419,7 +375,7 @@ describe('call provider apis', () => {
     expect(result.output).toBe(' Because of Rayleigh scattering.');
   });
 
-  test('WebhookProvider callApi', async () => {
+  it('WebhookProvider callApi', async () => {
     const mockResponse = {
       text: jest.fn().mockResolvedValue(
         JSON.stringify({
@@ -427,7 +383,7 @@ describe('call provider apis', () => {
         }),
       ),
     };
-    (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+    jest.mocked(fetch).mockResolvedValue(mockResponse);
 
     const provider = new WebhookProvider('http://example.com/webhook');
     const result = await provider.callApi('Test prompt');
@@ -440,11 +396,11 @@ describe('call provider apis', () => {
     ['Array format', [{ generated_text: 'Test output' }]], // Array format
     ['Object format', { generated_text: 'Test output' }], // Object format
   ])('HuggingfaceTextGenerationProvider callApi with %s', (format, mockedData) => {
-    test('returns expected output', async () => {
+    it('returns expected output', async () => {
       const mockResponse = {
         text: jest.fn().mockResolvedValue(JSON.stringify(mockedData)),
       };
-      (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+      jest.mocked(fetch).mockResolvedValue(mockResponse);
 
       const provider = new HuggingfaceTextGenerationProvider('gpt2');
       const result = await provider.callApi('Test prompt');
@@ -454,11 +410,11 @@ describe('call provider apis', () => {
     });
   });
 
-  test('HuggingfaceFeatureExtractionProvider callEmbeddingApi', async () => {
+  it('HuggingfaceFeatureExtractionProvider callEmbeddingApi', async () => {
     const mockResponse = {
       text: jest.fn().mockResolvedValue(JSON.stringify([0.1, 0.2, 0.3, 0.4, 0.5])),
     };
-    (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+    jest.mocked(fetch).mockResolvedValue(mockResponse);
 
     const provider = new HuggingfaceFeatureExtractionProvider('distilbert-base-uncased');
     const result = await provider.callEmbeddingApi('Test text');
@@ -467,7 +423,7 @@ describe('call provider apis', () => {
     expect(result.embedding).toEqual([0.1, 0.2, 0.3, 0.4, 0.5]);
   });
 
-  test('HuggingfaceTextClassificationProvider callClassificationApi', async () => {
+  it('HuggingfaceTextClassificationProvider callClassificationApi', async () => {
     const mockClassification = [
       [
         {
@@ -483,7 +439,7 @@ describe('call provider apis', () => {
     const mockResponse = {
       text: jest.fn().mockResolvedValue(JSON.stringify(mockClassification)),
     };
-    (fetch as unknown as jest.Mock).mockResolvedValue(mockResponse);
+    jest.mocked(fetch).mockResolvedValue(mockResponse);
 
     const provider = new HuggingfaceTextClassificationProvider('foo');
     const result = await provider.callClassificationApi('Test text');
@@ -500,7 +456,7 @@ describe('call provider apis', () => {
       enableCache();
     });
 
-    const fetchMock = fetch as unknown as jest.Mock;
+    const fetchMock = jest.mocked(fetch);
     const cloudflareMinimumConfig: Required<
       Pick<ICloudflareProviderBaseConfig, 'accountId' | 'apiKey'>
     > = {
@@ -518,7 +474,7 @@ describe('call provider apis', () => {
     };
 
     describe('CloudflareAiCompletionProvider', () => {
-      test('callApi with caching enabled', async () => {
+      it('callApi with caching enabled', async () => {
         const PROMPT = 'Test prompt for caching';
         const provider = new CloudflareAiCompletionProvider(testModelName, {
           config: cloudflareMinimumConfig,
@@ -551,7 +507,7 @@ describe('call provider apis', () => {
         expect(resultFromCache.tokenUsage).toEqual(tokenUsageDefaultResponse);
       });
 
-      test('callApi with caching disabled', async () => {
+      it('callApi with caching disabled', async () => {
         const PROMPT = 'test prompt without caching';
         try {
           disableCache();
@@ -588,7 +544,7 @@ describe('call provider apis', () => {
         }
       });
 
-      test('callApi handles cloudflare error properly', async () => {
+      it('callApi handles cloudflare error properly', async () => {
         const PROMPT = 'Test prompt for caching';
         const provider = new CloudflareAiCompletionProvider(testModelName, {
           config: cloudflareMinimumConfig,
@@ -610,7 +566,7 @@ describe('call provider apis', () => {
         expect(result.error).toContain(JSON.stringify(responsePayload.errors));
       });
 
-      test('Can be invoked with custom configuration', async () => {
+      it('Can be invoked with custom configuration', async () => {
         const cloudflareChatConfig: ICloudflareProviderConfig = {
           accountId: 'MADE_UP_ACCOUNT_ID',
           apiKey: 'MADE_UP_API_KEY',
@@ -650,7 +606,7 @@ describe('call provider apis', () => {
         await cfProvider.callApi(PROMPT);
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
-        expect(fetchMock.mock.calls.length).toBe(1);
+        expect(fetchMock.mock.calls).toHaveLength(1);
         const [url, { body, headers, method }] = fetchMock.mock.calls[0];
         expect(url).toContain(cloudflareChatConfig.accountId);
         expect(method).toBe('POST');
@@ -665,7 +621,7 @@ describe('call provider apis', () => {
     });
 
     describe('CloudflareAiChatCompletionProvider', () => {
-      test('Should handle chat provider', async () => {
+      it('Should handle chat provider', async () => {
         const provider = new CloudflareAiChatCompletionProvider(testModelName, {
           config: cloudflareMinimumConfig,
         });
@@ -693,7 +649,7 @@ describe('call provider apis', () => {
     });
 
     describe('CloudflareAiEmbeddingProvider', () => {
-      test('Should return embeddings in the proper format', async () => {
+      it('Should return embeddings in the proper format', async () => {
         const provider = new CloudflareAiEmbeddingProvider(testModelName, {
           config: cloudflareMinimumConfig,
         });
@@ -729,13 +685,14 @@ describe('call provider apis', () => {
     ['./path/to/file.py run', './path/to/file.py', ['run']],
     ['"/Path/To/My File.py"', '/Path/To/My File.py', []],
   ])('ScriptCompletionProvider callApi with script %s', (script, inputFile, inputArgs) => {
-    test('returns expected output', async () => {
+    it('returns expected output', async () => {
       const mockResponse = 'Test script output';
       const mockChildProcess = {
         stdout: new Stream.Readable(),
         stderr: new Stream.Readable(),
       } as child_process.ChildProcess;
-      jest
+
+      const execFileSpy = jest
         .spyOn(child_process, 'execFile')
         .mockImplementation(
           (
@@ -750,20 +707,9 @@ describe('call provider apis', () => {
                   stderr: string | Buffer,
                 ) => void),
           ) => {
-            expect(callback).toBeTruthy();
-            if (callback) {
-              expect(file).toContain(inputFile);
-              expect(args).toEqual(
-                expect.arrayContaining(
-                  inputArgs.concat([
-                    'Test prompt',
-                    '{"config":{"some_config_val":42}}',
-                    '{"vars":{"var1":"value 1","var2":"value 2 \\"with some double \\"quotes\\"\\""}}',
-                  ]),
-                ),
-              );
-              process.nextTick(() => callback(null, Buffer.from(mockResponse), Buffer.from('')));
-            }
+            process.nextTick(
+              () => callback && callback(null, Buffer.from(mockResponse), Buffer.from('')),
+            );
             return mockChildProcess;
           },
         );
@@ -781,7 +727,19 @@ describe('call provider apis', () => {
       });
 
       expect(result.output).toBe(mockResponse);
-      expect(child_process.execFile).toHaveBeenCalledTimes(1);
+      expect(execFileSpy).toHaveBeenCalledTimes(1);
+      expect(execFileSpy).toHaveBeenCalledWith(
+        expect.stringContaining(inputFile),
+        expect.arrayContaining(
+          inputArgs.concat([
+            'Test prompt',
+            '{"config":{"some_config_val":42}}',
+            '{"vars":{"var1":"value 1","var2":"value 2 \\"with some double \\"quotes\\"\\""}}',
+          ]),
+        ),
+        expect.any(Object),
+        expect.any(Function),
+      );
 
       jest.restoreAllMocks();
     });
@@ -789,11 +747,11 @@ describe('call provider apis', () => {
 });
 
 describe('loadApiProvider', () => {
-  test('loadApiProvider with filepath', async () => {
+  it('loadApiProvider with filepath', async () => {
     const mockYamlContent = `id: 'openai:gpt-4'
 config:
   key: 'value'`;
-    (fs.readFileSync as jest.Mock).mockReturnValueOnce(mockYamlContent);
+    jest.mocked(fs.readFileSync).mockReturnValueOnce(mockYamlContent);
 
     const provider = await loadApiProvider('file://path/to/mock-provider-file.yaml');
     expect(provider.id()).toBe('openai:gpt-4');
@@ -801,118 +759,184 @@ config:
     expect(fs.readFileSync).toHaveBeenCalledWith('path/to/mock-provider-file.yaml', 'utf8');
   });
 
-  test('loadApiProvider with openai:chat', async () => {
+  it('loadApiProvider with openai:chat', async () => {
     const provider = await loadApiProvider('openai:chat');
     expect(provider).toBeInstanceOf(OpenAiChatCompletionProvider);
   });
 
-  test('loadApiProvider with openai:completion', async () => {
+  it('loadApiProvider with openai:completion', async () => {
     const provider = await loadApiProvider('openai:completion');
     expect(provider).toBeInstanceOf(OpenAiCompletionProvider);
   });
 
-  test('loadApiProvider with openai:assistant', async () => {
+  it('loadApiProvider with openai:assistant', async () => {
     const provider = await loadApiProvider('openai:assistant:foobar');
     expect(provider).toBeInstanceOf(OpenAiAssistantProvider);
   });
 
-  test('loadApiProvider with openai:chat:modelName', async () => {
+  it('loadApiProvider with openai:chat:modelName', async () => {
     const provider = await loadApiProvider('openai:chat:gpt-3.5-turbo');
     expect(provider).toBeInstanceOf(OpenAiChatCompletionProvider);
   });
 
-  test('loadApiProvider with openai:completion:modelName', async () => {
+  it('loadApiProvider with openai:completion:modelName', async () => {
     const provider = await loadApiProvider('openai:completion:text-davinci-003');
     expect(provider).toBeInstanceOf(OpenAiCompletionProvider);
   });
 
-  test('loadApiProvider with OpenAI finetuned model', async () => {
+  it('loadApiProvider with OpenAI finetuned model', async () => {
     const provider = await loadApiProvider('openai:chat:ft:gpt-3.5-turbo-0613:company-name::ID:');
     expect(provider).toBeInstanceOf(OpenAiChatCompletionProvider);
     expect(provider.id()).toBe('openai:ft:gpt-3.5-turbo-0613:company-name::ID:');
   });
 
-  test('loadApiProvider with azureopenai:completion:modelName', async () => {
+  it('loadApiProvider with azureopenai:completion:modelName', async () => {
     const provider = await loadApiProvider('azureopenai:completion:text-davinci-003');
     expect(provider).toBeInstanceOf(AzureOpenAiCompletionProvider);
   });
 
-  test('loadApiProvider with azureopenai:chat:modelName', async () => {
+  it('loadApiProvider with azureopenai:chat:modelName', async () => {
     const provider = await loadApiProvider('azureopenai:chat:gpt-3.5-turbo');
     expect(provider).toBeInstanceOf(AzureOpenAiChatCompletionProvider);
   });
 
-  test('loadApiProvider with anthropic:completion', async () => {
+  it('loadApiProvider with anthropic:completion', async () => {
     const provider = await loadApiProvider('anthropic:completion');
     expect(provider).toBeInstanceOf(AnthropicCompletionProvider);
   });
 
-  test('loadApiProvider with anthropic:completion:modelName', async () => {
+  it('loadApiProvider with anthropic:completion:modelName', async () => {
     const provider = await loadApiProvider('anthropic:completion:claude-1');
     expect(provider).toBeInstanceOf(AnthropicCompletionProvider);
   });
 
-  test('loadApiProvider with ollama:modelName', async () => {
+  it('loadApiProvider with ollama:modelName', async () => {
     const provider = await loadApiProvider('ollama:llama2:13b');
     expect(provider).toBeInstanceOf(OllamaCompletionProvider);
     expect(provider.id()).toBe('ollama:completion:llama2:13b');
   });
 
-  test('loadApiProvider with ollama:completion:modelName', async () => {
+  it('loadApiProvider with ollama:completion:modelName', async () => {
     const provider = await loadApiProvider('ollama:completion:llama2:13b');
     expect(provider).toBeInstanceOf(OllamaCompletionProvider);
     expect(provider.id()).toBe('ollama:completion:llama2:13b');
   });
 
-  test('loadApiProvider with ollama:chat:modelName', async () => {
+  it('loadApiProvider with ollama:chat:modelName', async () => {
     const provider = await loadApiProvider('ollama:chat:llama2:13b');
     expect(provider).toBeInstanceOf(OllamaChatProvider);
     expect(provider.id()).toBe('ollama:chat:llama2:13b');
   });
 
-  test('loadApiProvider with llama:modelName', async () => {
+  it('loadApiProvider with llama:modelName', async () => {
     const provider = await loadApiProvider('llama');
     expect(provider).toBeInstanceOf(LlamaProvider);
   });
 
-  test('loadApiProvider with webhook', async () => {
+  it('loadApiProvider with webhook', async () => {
     const provider = await loadApiProvider('webhook:http://example.com/webhook');
     expect(provider).toBeInstanceOf(WebhookProvider);
   });
 
-  test('loadApiProvider with huggingface:text-generation', async () => {
+  it('loadApiProvider with huggingface:text-generation', async () => {
     const provider = await loadApiProvider('huggingface:text-generation:foobar/baz');
     expect(provider).toBeInstanceOf(HuggingfaceTextGenerationProvider);
   });
 
-  test('loadApiProvider with huggingface:feature-extraction', async () => {
+  it('loadApiProvider with huggingface:feature-extraction', async () => {
     const provider = await loadApiProvider('huggingface:feature-extraction:foobar/baz');
     expect(provider).toBeInstanceOf(HuggingfaceFeatureExtractionProvider);
   });
 
-  test('loadApiProvider with huggingface:text-classification', async () => {
+  it('loadApiProvider with huggingface:text-classification', async () => {
     const provider = await loadApiProvider('huggingface:text-classification:foobar/baz');
     expect(provider).toBeInstanceOf(HuggingfaceTextClassificationProvider);
   });
 
-  test('loadApiProvider with hf:text-classification', async () => {
+  it('loadApiProvider with hf:text-classification', async () => {
     const provider = await loadApiProvider('hf:text-classification:foobar/baz');
     expect(provider).toBeInstanceOf(HuggingfaceTextClassificationProvider);
   });
 
-  test('loadApiProvider with bedrock:completion', async () => {
+  it('loadApiProvider with bedrock:completion', async () => {
     const provider = await loadApiProvider('bedrock:completion:anthropic.claude-v2:1');
     expect(provider).toBeInstanceOf(AwsBedrockCompletionProvider);
   });
 
-  test('loadApiProvider with openrouter', async () => {
+  it('loadApiProvider with openrouter', async () => {
     const provider = await loadApiProvider('openrouter:mistralai/mistral-medium');
     expect(provider).toBeInstanceOf(OpenAiChatCompletionProvider);
     // Intentionally openai, because it's just a wrapper around openai
     expect(provider.id()).toBe('mistralai/mistral-medium');
   });
 
-  test('loadApiProvider with cloudflare-ai', async () => {
+  it('loadApiProvider with voyage', async () => {
+    const provider = await loadApiProvider('voyage:voyage-2');
+    expect(provider).toBeInstanceOf(VoyageEmbeddingProvider);
+    expect(provider.id()).toBe('voyage:voyage-2');
+  });
+
+  it('loadApiProvider with vertex:chat', async () => {
+    const provider = await loadApiProvider('vertex:chat:vertex-chat-model');
+    expect(provider).toBeInstanceOf(VertexChatProvider);
+    expect(provider.id()).toBe('vertex:vertex-chat-model');
+  });
+
+  it('loadApiProvider with vertex:embedding', async () => {
+    const provider = await loadApiProvider('vertex:embedding:vertex-embedding-model');
+    expect(provider).toBeInstanceOf(VertexEmbeddingProvider);
+    expect(provider.id()).toBe('vertex:vertex-embedding-model');
+  });
+
+  it('loadApiProvider with vertex:embeddings', async () => {
+    const provider = await loadApiProvider('vertex:embeddings:vertex-embedding-model');
+    expect(provider).toBeInstanceOf(VertexEmbeddingProvider);
+    expect(provider.id()).toBe('vertex:vertex-embedding-model');
+  });
+
+  it('loadApiProvider with vertex:modelname', async () => {
+    const provider = await loadApiProvider('vertex:vertex-chat-model');
+    expect(provider).toBeInstanceOf(VertexChatProvider);
+    expect(provider.id()).toBe('vertex:vertex-chat-model');
+  });
+
+  it('loadApiProvider with replicate:modelname', async () => {
+    const provider = await loadApiProvider('replicate:meta/llama3');
+    expect(provider).toBeInstanceOf(ReplicateProvider);
+    expect(provider.id()).toBe('replicate:meta/llama3');
+  });
+
+  it('loadApiProvider with replicate:modelname:version', async () => {
+    const provider = await loadApiProvider('replicate:meta/llama3:abc123');
+    expect(provider).toBeInstanceOf(ReplicateProvider);
+    expect(provider.id()).toBe('replicate:meta/llama3:abc123');
+  });
+
+  it('loadApiProvider with replicate:image', async () => {
+    const provider = await loadApiProvider('replicate:image:stability-ai/sdxl');
+    expect(provider).toBeInstanceOf(ReplicateImageProvider);
+    expect(provider.id()).toBe('replicate:stability-ai/sdxl');
+  });
+
+  it('loadApiProvider with replicate:image:version', async () => {
+    const provider = await loadApiProvider('replicate:image:stability-ai/sdxl:abc123');
+    expect(provider).toBeInstanceOf(ReplicateImageProvider);
+    expect(provider.id()).toBe('replicate:stability-ai/sdxl:abc123');
+  });
+
+  it('loadApiProvider with replicate:moderation', async () => {
+    const provider = await loadApiProvider('replicate:moderation:foo/bar');
+    expect(provider).toBeInstanceOf(ReplicateModerationProvider);
+    expect(provider.id()).toBe('replicate:foo/bar');
+  });
+
+  it('loadApiProvider with replicate:moderation:version', async () => {
+    const provider = await loadApiProvider('replicate:moderation:foo/bar:abc123');
+    expect(provider).toBeInstanceOf(ReplicateModerationProvider);
+    expect(provider.id()).toBe('replicate:foo/bar:abc123');
+  });
+
+  it('loadApiProvider with cloudflare-ai', async () => {
     const supportedModelTypes = [
       { modelType: 'chat', providerKlass: CloudflareAiChatCompletionProvider },
       { modelType: 'embedding', providerKlass: CloudflareAiEmbeddingProvider },
@@ -923,14 +947,14 @@ config:
     const modelName = 'mistralai/mistral-medium';
 
     // Without any model type should throw an error
-    await expect(() => loadApiProvider(`cloudflare-ai:${modelName}`)).rejects.toThrowError(
+    await expect(loadApiProvider(`cloudflare-ai:${modelName}`)).rejects.toThrow(
       /Unknown Cloudflare AI model type/,
     );
 
     for (const unsupportedModelType of unsupportedModelTypes) {
-      await expect(() =>
+      await expect(
         loadApiProvider(`cloudflare-ai:${unsupportedModelType}:${modelName}`),
-      ).rejects.toThrowError(/Unknown Cloudflare AI model type/);
+      ).rejects.toThrow(/Unknown Cloudflare AI model type/);
     }
 
     for (const { modelType, providerKlass } of supportedModelTypes) {
@@ -943,7 +967,7 @@ config:
     }
   });
 
-  test('loadApiProvider with RawProviderConfig', async () => {
+  it('loadApiProvider with RawProviderConfig', async () => {
     const rawProviderConfig = {
       'openai:chat': {
         id: 'test',
@@ -956,7 +980,7 @@ config:
     expect(provider).toBeInstanceOf(OpenAiChatCompletionProvider);
   });
 
-  test('loadApiProviders with ProviderFunction', async () => {
+  it('loadApiProviders with ProviderFunction', async () => {
     const providerFunction: ProviderFunction = async (prompt: string) => {
       return {
         output: `Output for ${prompt}`,
@@ -971,7 +995,51 @@ config:
     expect(response.tokenUsage).toEqual({ total: 10, prompt: 5, completion: 5 });
   });
 
-  test('loadApiProviders with RawProviderConfig[]', async () => {
+  it('loadApiProviders with CustomApiProvider', async () => {
+    const providerPath = 'file://path/to/file.js';
+
+    class CustomApiProvider {
+      id() {
+        return 'custom-api-provider';
+      }
+
+      async callApi(input: string) {
+        return { output: `Processed ${input}` };
+      }
+    }
+
+    jest.mocked(importModule).mockResolvedValue(CustomApiProvider);
+    const providers = await loadApiProviders(providerPath);
+    expect(importModule).toHaveBeenCalledWith(path.resolve('path/to/file.js'));
+    expect(providers).toHaveLength(1);
+    expect(providers[0].id()).toBe('custom-api-provider');
+    const response = await providers[0].callApi('Test input');
+    expect(response.output).toBe('Processed Test input');
+  });
+
+  it('loadApiProviders with CustomApiProvider, absolute path', async () => {
+    const providerPath = 'file:///absolute/path/to/file.js';
+
+    class CustomApiProvider {
+      id() {
+        return 'custom-api-provider';
+      }
+
+      async callApi(input: string) {
+        return { output: `Processed ${input}` };
+      }
+    }
+
+    jest.mocked(importModule).mockResolvedValue(CustomApiProvider);
+    const providers = await loadApiProviders(providerPath);
+    expect(importModule).toHaveBeenCalledWith('/absolute/path/to/file.js');
+    expect(providers).toHaveLength(1);
+    expect(providers[0].id()).toBe('custom-api-provider');
+    const response = await providers[0].callApi('Test input');
+    expect(response.output).toBe('Processed Test input');
+  });
+
+  it('loadApiProviders with RawProviderConfig[]', async () => {
     const rawProviderConfigs: ProviderOptionsMap[] = [
       {
         'openai:chat:abc123': {
@@ -996,7 +1064,7 @@ config:
     expect(providers[2]).toBeInstanceOf(AnthropicCompletionProvider);
   });
 
-  test('loadApiProvider sets provider.delay', async () => {
+  it('loadApiProvider sets provider.delay', async () => {
     const providerOptions = {
       id: 'test-delay',
       config: {},

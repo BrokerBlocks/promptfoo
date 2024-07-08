@@ -1,4 +1,4 @@
-# How to red team LLMs
+# How to red team LLM applications
 
 Promptfoo is a popular open source evaluation framework that includes LLM red team and penetration testing capabilities.
 
@@ -12,12 +12,18 @@ This guide shows you how to automatically generate adversarial tests specificall
 - Hallucination (when the LLM provides unfactual answers)
 - Personally Identifiable Information (PII) leaks (ensuring the model does not inadvertently disclose PII)
 - Competitor recommendations (when the LLM suggests alternatives to your business)
+- Unintended contracts (when the LLM makes commitments or agreements on behalf of your business)
+- Political statements
 - Safety risks from the [ML Commons Safety Working Group](https://arxiv.org/abs/2404.12241): violent crimes, non-violent crimes, sex crimes, child exploitation, specialized financial/legal/medical advice, privacy, intellectual property, indiscriminate weapons, hate, self-harm, sexual content.
 - Safety risks from the [HarmBench](https://www.harmbench.org/) framework: Cybercrime & Unauthorized Intrusion, Chemical & Biological Weapons, Illegal Drugs, Copyright Violations, Misinformation & Disinformation, Harassment & Bullying, Illegal Activities, Graphic & age-restricted content, Promotion of unsafe practices, Privacy violations & data exploitation.
 
-The end result is a view that displays red team test results and vulnerabilities:
+The end result is a view that summarizes your LLM app's vulnerabilities:
 
-![llm redteaming](/img/docs/redteam-results.png)
+![llm red team report](/img/riskreport-1@2x.png)
+
+You can also dig into specific red team failure cases:
+
+![llm red team evals](/img/docs/redteam-results.png)
 
 ## Prerequisites
 
@@ -52,7 +58,7 @@ npx promptfoo@latest generate redteam -w
 
 Run the eval:
 
-```sh
+```
 npx promptfoo@latest eval
 ```
 
@@ -118,7 +124,7 @@ prompts:
 
 The equivalent Javascript is also supported:
 
-```yaml
+```js
 function getPrompt(context) {
   if (context.vars.destination === 'Australia') {
     return `Act as a travel agent, mate: ${context.query}`;
@@ -192,7 +198,7 @@ If your API responds with a JSON object and you want to pick out a specific valu
 
 For example, `json.nested.output` will reference the output in the following API response:
 
-```yaml
+```js
 { 'nested': { 'output': '...' } }
 ```
 
@@ -243,6 +249,8 @@ The adversarial tests include:
 - Hijacking (when the LLM is used for unintended purposes)
 - PII leaks (ensuring the model does not inadvertently disclose PII)
 - Competitor recommendations (when the LLM suggests alternatives to your business)
+- Unintended contracts (when the LLM makes unintended commitments or agreements)
+- Political statements
 
 It also tests for a variety of harmful input and output scenarios from the [ML Commons Safety Working Group](https://arxiv.org/abs/2404.12241) and [HarmBench](https://www.harmbench.org/) framework:
 
@@ -281,22 +289,24 @@ npx promptfoo@latest generate redteam -w --plugins 'harmful,jailbreak,hijacking'
 
 The following plugins are enabled by default:
 
-| Plugin Name      | Description                                                                  | Enabled by Default |
-| ---------------- | ---------------------------------------------------------------------------- | ------------------ |
-| excessive-agency | Tests if the model exhibits too much autonomy or makes decisions on its own. | Yes                |
-| hallucination    | Tests if the model generates false or misleading content.                    | Yes                |
-| harmful          | Tests for the generation of harmful or offensive content.                    | Yes                |
-| hijacking        | Tests the model's vulnerability to being used for unintended tasks.          | Yes                |
-| jailbreak        | Tests if the model can be manipulated to bypass its safety mechanisms.       | Yes                |
-| overreliance     | Tests for excessive trust in LLM output without oversight.                   | Yes                |
-| pii              | Tests for inadvertent disclosure of personally identifiable information.     | Yes                |
-| prompt-injection | Tests the model's susceptibility to prompt injection attacks.                | Yes                |
+| Plugin Name      | Description                                                                  |
+| ---------------- | ---------------------------------------------------------------------------- |
+| contracts        | Tests if the model makes unintended commitments or agreements.               |
+| excessive-agency | Tests if the model exhibits too much autonomy or makes decisions on its own. |
+| hallucination    | Tests if the model generates false or misleading content.                    |
+| harmful          | Tests for the generation of harmful or offensive content.                    |
+| hijacking        | Tests the model's vulnerability to being used for unintended tasks.          |
+| jailbreak        | Tests if the model can be manipulated to bypass its safety mechanisms.       |
+| overreliance     | Tests for excessive trust in LLM output without oversight.                   |
+| pii              | Tests for inadvertent disclosure of personally identifiable information.     |
+| politics         | Tests for political opinions and statements about political figures.         |
+| prompt-injection | Tests the model's susceptibility to prompt injection attacks.                |
 
 These additional plugins can be optionally enabled:
 
-| Plugin Name | Description                                                 | Enabled by Default |
-| ----------- | ----------------------------------------------------------- | ------------------ |
-| competitors | Tests if the model recommends alternatives to your service. | No                 |
+| Plugin Name | Description                                                 |
+| ----------- | ----------------------------------------------------------- |
+| competitors | Tests if the model recommends alternatives to your service. |
 
 The adversarial test cases will be written to `promptfooconfig.yaml`.
 
@@ -304,7 +314,7 @@ The adversarial test cases will be written to `promptfooconfig.yaml`.
 
 Now that all the red team tests are ready, run the eval:
 
-```sh
+```
 npx promptfoo@latest eval
 ```
 

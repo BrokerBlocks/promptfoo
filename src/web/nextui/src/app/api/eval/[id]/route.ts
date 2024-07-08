@@ -1,13 +1,9 @@
-import * as fs from 'fs';
-
-import { NextRequest, NextResponse } from 'next/server';
-import { validate as uuidValidate } from 'uuid';
-
-import store from '@/app/api/eval/shareStore';
-import { IS_RUNNING_LOCALLY } from '@/constants';
-
 import type { EvaluateTable, FilePath, ResultsFile, UnifiedConfig } from '@/../../../types';
 import { readResult, updateResult, deleteEval } from '@/../../../util';
+import store from '@/app/api/eval/shareStore';
+import { IS_RUNNING_LOCALLY } from '@/constants';
+import { NextRequest, NextResponse } from 'next/server';
+import { validate as uuidValidate } from 'uuid';
 
 export const dynamic = IS_RUNNING_LOCALLY ? 'auto' : 'force-dynamic';
 

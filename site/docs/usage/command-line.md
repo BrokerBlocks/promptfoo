@@ -18,6 +18,7 @@ The `promptfoo` command line utility supports the following subcommands:
   - `list prompts`
   - `list datasets`
 - `show <id>` - Show details of a specific resource (evaluation, prompt, dataset).
+- `delete <id>` - Delete a resource by its ID (currently, just evaluations)
 - `feedback <message>` - Send feedback to the Promptfoo developers.
 
 ## `promptfoo eval`
@@ -26,12 +27,12 @@ By default the `eval` command will read the `promptfooconfig.yaml` configuration
 
 | Option                              | Description                                                                                                                                                                                        |
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `-p, --prompts <paths...>`          | Paths to [prompt files](/docs/configuration/parameters#prompt-files), directory, or glob                                                                                                           |
+| `-p, --prompts <paths...>`          | Paths to [prompt files](/docs/configuration/parameters#prompts), directory, or glob                                                                                                                |
 | `-r, --providers <name or path...>` | [`openai:chat`][1], [`openai:completion`][1], [`localai:chat:<model-name>`][2], [`localai:completion:<model-name>`][2], or one of the many other permutations per [API providers](/docs/providers) |
 | `-o, --output <paths...>`           | Path to [output file](/docs/configuration/parameters#output-file) (csv, json, yaml, html)                                                                                                          |
-| `-t, --tests <path>`                | Path to [external test file](/docs/configuration/expected-outputs#load-an-external-tests-file)                                                                                                     |
+| `-t, --tests <path>`                | Path to [external test file](/docs/configuration/parameters#tests-file)                                                                                                                            |
 | `-c, --config <path>`               | Path to one or more [configuration files](/docs/configuration/guide). `promptfooconfig.js/json/yaml` is automatically loaded if present. Wildcards and directories are supported.                  |
-| `--grader`                          | [Provider](/docs/providers) that will conduct the evaluation, if you are [using LLM to grade your output](/docs/configuration/expected-outputs#llm-evaluation)                                     |
+| `--grader`                          | [Provider](/docs/providers) that will conduct the evaluation, if you are [using LLM to grade your output](/docs/configuration/expected-outputs/model-graded)                                       |
 | `--repeat <number>`                 | Number of times to repeat each test case. Disables cache if >1                                                                                                                                     |
 | `--delay <number>`                  | Force the test runner to wait after each API call (milliseconds)                                                                                                                                   |
 | `--no-cache`                        | Disable cache                                                                                                                                                                                      |
@@ -50,6 +51,7 @@ By default the `eval` command will read the `promptfooconfig.yaml` configuration
 | `--filter-failing <path>`           | Run only failing tests from previous evaluation. Path to JSON output file from the previous evaluation.                                                                                            |
 | `-n, --filter-first-n`              | Run the first N test cases                                                                                                                                                                         |
 | `--filter-pattern <pattern>`        | Run only test cases whose `description` matches the regex pattern                                                                                                                                  |
+| `--filter-providers <pattern>`      | Run only test cases whose provider ids or label match the regex pattern                                                                                                                            |
 
 [1]: /docs/providers/openai
 [2]: /docs/providers/localai
@@ -123,17 +125,25 @@ Show details of a specific resource.
 | `prompt <id>`  | Show details of a specific prompt     |
 | `dataset <id>` | Show details of a specific dataset    |
 
+## `promptfoo delete <id>`
+
+Deletes a specific resource.
+
+| Option      | Description                |
+| ----------- | -------------------------- |
+| `eval <id>` | Delete an evaluation by id |
+
 ## `promptfoo import <filepath>`
 
 Import an eval file from JSON format.
 
-## `promptfoo export`
+## `promptfoo export <evalId>`
 
-Export an eval record to JSON format. Outputs to stdout by default.
+Export an eval record to JSON format. To export the most recent, use evalId `latest`.
 
-| Option                    | Description   |
-| ------------------------- | ------------- |
-| `-o, --output <filepath>` | File to write |
+| Option                    | Description                                 |
+| ------------------------- | ------------------------------------------- |
+| `-o, --output <filepath>` | File to write. Writes to stdout by default. |
 
 # Environment variables
 
@@ -169,13 +179,13 @@ BETA: Generate synthetic test cases based on existing prompts and variables.
 
 For example, this command will modify your default config file (usually `promptfooconfig.yaml`) with new test cases:
 
-```
+```sh
 promptfoo generate dataset -w
 ```
 
 This command will generate test cases for a specific config and write them to a file, while following special instructions:
 
-```
+```sh
 promptfoo generate dataset -c my_config.yaml -o new_tests.yaml -i 'All test cases for {{location}} must be European cities'
 ```
 
@@ -211,13 +221,13 @@ providers:
 
 This command will generate adversarial test cases and write them to the file:
 
-```
+```sh
 promptfoo generate redteam -w
 ```
 
 This command overrides the system purpose and the variable to inject adversarial user input:
 
-```
+```sh
 promptfoo generate redteam -w --purpose 'Travel agent that helps users plan trips' --injectVar 'message'
 ```
 
@@ -233,6 +243,6 @@ To disable terminal colors for printed outputs, set `FORCE_COLOR=0` (this is sup
 
 For the `eval` command, you may also want to disable the progress bar and table as well, because they use special characters:
 
-```
+```sh
 FORCE_COLOR=0 promptfoo eval --no-progress-bar --no-table
 ```

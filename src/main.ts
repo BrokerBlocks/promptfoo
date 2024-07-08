@@ -1,22 +1,52 @@
 #!/usr/bin/env node
-import fs from 'fs';
-import path from 'path';
-import readline from 'readline';
-
 import chalk from 'chalk';
 import chokidar from 'chokidar';
-import yaml from 'js-yaml';
 import { Command } from 'commander';
-
-import cliState from './cliState';
-import telemetry from './telemetry';
-import logger, { getLogLevel, setLogLevel } from './logger';
+import dedent from 'dedent';
+import fs from 'fs';
+import yaml from 'js-yaml';
+import path from 'path';
+import readline from 'readline';
+import invariant from 'tiny-invariant';
 import { readAssertions } from './assertions';
-import { loadApiProvider, loadApiProviders } from './providers';
+import { validateAssertions } from './assertions/validateAssertions';
+import { disableCache, clearCache } from './cache';
+import { checkNodeVersion } from './checkNodeVersion';
+import cliState from './cliState';
+import { configCommand } from './commands/config';
+import { deleteCommand } from './commands/delete';
+import { filterProviders } from './commands/eval/filterProviders';
+import { filterTests } from './commands/eval/filterTests';
+import { exportCommand } from './commands/export';
+import { importCommand } from './commands/import';
+import { listCommand } from './commands/list';
+import { showCommand } from './commands/show';
+import { getDirectory } from './esm';
 import { evaluate, DEFAULT_MAX_CONCURRENCY } from './evaluator';
+import { gatherFeedback } from './feedback';
+import logger, { getLogLevel, setLogLevel } from './logger';
+import { createDummyFiles } from './onboarding';
 import { readPrompts, readProviderPromptMap } from './prompts';
+import { loadApiProvider, loadApiProviders } from './providers';
+import {
+  DEFAULT_PLUGINS as REDTEAM_DEFAULT_PLUGINS,
+  ADDITIONAL_PLUGINS as REDTEAM_ADDITIONAL_PLUGINS,
+  synthesizeFromTestSuite as redteamSynthesizeFromTestSuite,
+} from './redteam';
+import { REDTEAM_MODEL } from './redteam/constants';
+import { createShareableUrl } from './share';
+import { generateTable } from './table';
+import telemetry from './telemetry';
 import { readTest, readTests, synthesizeFromTestSuite } from './testCases';
-import { synthesizeFromTestSuite as redteamSynthesizeFromTestSuite } from './redteam';
+import {
+  ProviderSchema,
+  type CommandLineOptions,
+  type EvaluateOptions,
+  type TestCase,
+  type TestSuite,
+  type UnifiedConfig,
+} from './types';
+import { checkForUpdates } from './updates';
 import {
   cleanupOldFileResults,
   maybeReadConfig,
@@ -31,30 +61,7 @@ import {
   writeOutput,
   writeResultsToDatabase,
 } from './util';
-import { createDummyFiles } from './onboarding';
-import { disableCache, clearCache } from './cache';
-import { getDirectory } from './esm';
 import { BrowserBehavior, startServer } from './web/server';
-import { checkForUpdates } from './updates';
-import { gatherFeedback } from './feedback';
-import { listCommand } from './commands/list';
-import { showCommand } from './commands/show';
-import { deleteCommand } from './commands/delete';
-import { importCommand } from './commands/import';
-import { exportCommand } from './commands/export';
-
-import type {
-  CommandLineOptions,
-  EvaluateOptions,
-  TestCase,
-  TestSuite,
-  UnifiedConfig,
-} from './types';
-import { generateTable } from './table';
-import { createShareableUrl } from './share';
-import { filterTests } from './commands/eval/filterTests';
-import { validateAssertions } from './assertions/validateAssertions';
-import dedent from 'dedent';
 
 async function resolveConfigs(
   cmdObj: Partial<CommandLineOptions>,
@@ -114,7 +121,9 @@ async function resolveConfigs(
         ? false
         : fileConfig.sharing ?? defaultConfig.sharing ?? true,
     defaultTest: defaultTestRaw ? await readTest(defaultTestRaw, basePath) : undefined,
+    derivedMetrics: fileConfig.derivedMetrics || defaultConfig.derivedMetrics,
     outputPath: cmdObj.output || fileConfig.outputPath || defaultConfig.outputPath,
+    metadata: fileConfig.metadata || defaultConfig.metadata,
   };
 
   // Validation
@@ -122,12 +131,33 @@ async function resolveConfigs(
     logger.error(chalk.red('You must provide at least 1 prompt'));
     process.exit(1);
   }
+
   if (!config.providers || config.providers.length === 0) {
-    logger.error(
-      chalk.red('You must specify at least 1 provider (for example, openai:gpt-3.5-turbo)'),
-    );
+    logger.error(chalk.red('You must specify at least 1 provider (for example, openai:gpt-4o)'));
     process.exit(1);
   }
+  invariant(Array.isArray(config.providers), 'providers must be an array');
+  config.providers.forEach((provider) => {
+    const result = ProviderSchema.safeParse(provider);
+    if (!result.success) {
+      const errors = result.error.errors
+        .map((err) => {
+          return `- ${err.message}`;
+        })
+        .join('\n');
+      const providerString = typeof provider === 'string' ? provider : JSON.stringify(provider);
+      logger.warn(
+        chalk.yellow(
+          dedent`
+              Provider: ${providerString} encountered errors during schema validation:
+
+                ${errors}
+
+              Please double check your configuration.` + '\n',
+        ),
+      );
+    }
+  });
 
   // Parse prompts, providers, and tests
   const parsedPrompts = await readPrompts(config.prompts, cmdObj.prompts ? undefined : basePath);
@@ -148,6 +178,20 @@ async function resolveConfigs(
         cmdObj.tests ? undefined : basePath,
       );
       scenario.tests = parsedScenarioTests;
+      const filteredTests = await filterTests(
+        {
+          ...scenario,
+          providers: parsedProviders,
+          prompts: parsedPrompts,
+        },
+        {
+          firstN: cmdObj.filterFirstN,
+          pattern: cmdObj.filterPattern,
+          failing: cmdObj.filterFailing,
+        },
+      );
+      invariant(filteredTests, 'filteredTests are undefined');
+      scenario.tests = filteredTests;
     }
   }
 
@@ -177,6 +221,7 @@ async function resolveConfigs(
     tests: parsedTests,
     scenarios: config.scenarios,
     defaultTest,
+    derivedMetrics: config.derivedMetrics,
     nunjucksFilters: await readFilters(
       fileConfig.nunjucksFilters || defaultConfig.nunjucksFilters || {},
     ),
@@ -197,6 +242,7 @@ async function main() {
     path.join(pwd, 'promptfooconfig.js'),
     path.join(pwd, 'promptfooconfig.json'),
     path.join(pwd, 'promptfooconfig.yaml'),
+    path.join(pwd, 'promptfooconfig.yml'),
   ];
   let defaultConfig: Partial<UnifiedConfig> = {};
   let defaultConfigPath: string | undefined;
@@ -224,6 +270,7 @@ async function main() {
       fs.readFileSync(path.join(getDirectory(), '../package.json'), 'utf8'),
     );
     logger.info(packageJson.version);
+    process.exit(0);
   });
 
   program
@@ -232,6 +279,9 @@ async function main() {
     .option('--no-interactive', 'Run in interactive mode')
     .action(async (directory: string | null, cmdObj: { interactive: boolean }) => {
       telemetry.maybeShowNotice();
+      telemetry.record('command_used', {
+        name: 'init - started',
+      });
       const details = await createDummyFiles(directory, cmdObj.interactive);
       telemetry.record('command_used', {
         ...details,
@@ -459,14 +509,16 @@ async function main() {
     );
 
   interface RedteamCommandOptions {
-    config?: string;
-    output?: string;
-    write: boolean;
+    addPlugins?: string[];
     cache: boolean;
+    config?: string;
     envFile?: string;
-    purpose?: string;
     injectVar?: string;
+    output?: string;
     plugins?: string[];
+    provider?: string;
+    purpose?: string;
+    write: boolean;
   }
 
   generateCommand
@@ -480,24 +532,41 @@ async function main() {
       'Set the system purpose. If not set, the system purpose will be inferred from the config file',
     )
     .option(
-      '--injectVar <varname>',
-      'Override the variable to inject user input into the prompt. If not set, the variable will defalt to {{query}}',
+      '--provider <provider>',
+      `Provider to use for generating adversarial tests. Defaults to: ${REDTEAM_MODEL}`,
     )
-    .option('--plugins <plugins>', 'Comma-separated list of plugins to use', (val) =>
-      val.split(',').map((x) => x.trim()),
+    .option(
+      '--injectVar <varname>',
+      'Override the variable to inject user input into the prompt. If not set, the variable will default to {{query}}',
+    )
+    .option(
+      '--plugins <plugins>',
+      dedent`Comma-separated list of plugins to use. Defaults to:
+        \n- ${Array.from(REDTEAM_DEFAULT_PLUGINS).sort().join('\n- ')}\n\n
+    `,
+      (val) => val.split(',').map((x) => x.trim()),
+    )
+    .option(
+      '--add-plugins <plugins>',
+      dedent`Comma-separated list of plugins to run in addition to the default plugins:
+        \n- ${REDTEAM_ADDITIONAL_PLUGINS.sort().join('\n- ')}\n\n
+      `,
+      (val) => val.split(',').map((x) => x.trim()),
     )
     .option('--no-cache', 'Do not read or write results to disk cache', false)
     .option('--env-file <path>', 'Path to .env file')
     .action(
       async ({
-        config,
-        output,
-        write,
+        addPlugins,
         cache,
+        config,
         envFile,
-        purpose,
         injectVar,
+        output,
         plugins,
+        provider,
+        purpose,
+        write,
       }: RedteamCommandOptions) => {
         setupEnv(envFile);
         if (!cache) {
@@ -530,14 +599,24 @@ async function main() {
         const redteamTests = await redteamSynthesizeFromTestSuite(testSuite, {
           purpose,
           injectVar,
-          plugins,
+          plugins:
+            addPlugins && addPlugins.length > 0
+              ? Array.from(plugins || REDTEAM_DEFAULT_PLUGINS).concat(addPlugins)
+              : plugins,
+          provider,
         });
 
         if (output) {
-          const existingYaml = yaml.load(fs.readFileSync(configPath, 'utf8')) as object;
+          const existingYaml = yaml.load(
+            fs.readFileSync(configPath, 'utf8'),
+          ) as Partial<UnifiedConfig>;
           const updatedYaml = {
             ...existingYaml,
             tests: redteamTests,
+            metadata: {
+              ...existingYaml.metadata,
+              redteam: true,
+            },
           };
           fs.writeFileSync(output, yaml.dump(updatedYaml, { skipInvalid: true }));
           printBorder();
@@ -659,6 +738,7 @@ async function main() {
       '--filter-pattern <pattern>',
       'Only run tests whose description matches the regular expression pattern',
     )
+    .option('--filter-providers <providers>', 'Only run tests with these providers')
     .option('--filter-failing <path>', 'Path to json output file')
     .option(
       '--var <key=value>',
@@ -716,6 +796,8 @@ async function main() {
           pattern: cmdObj.filterPattern,
           failing: cmdObj.filterFailing,
         });
+
+        testSuite.providers = filterProviders(testSuite.providers, cmdObj.filterProviders);
 
         const options: EvaluateOptions = {
           showProgressBar: getLogLevel() === 'debug' ? false : cmdObj.progressBar,
@@ -902,6 +984,7 @@ async function main() {
   deleteCommand(program);
   importCommand(program);
   exportCommand(program);
+  configCommand(program);
 
   program.parse(process.argv);
 
@@ -910,4 +993,7 @@ async function main() {
   }
 }
 
-main();
+if (require.main === module) {
+  checkNodeVersion();
+  main();
+}

@@ -9,7 +9,6 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Slider from '@mui/material/Slider';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-
 import { useStore as useResultsViewStore } from './store';
 
 interface SettingsModalProps {
@@ -31,6 +30,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) => {
     setPrettifyJson,
     showPrompts,
     setShowPrompts,
+    showPassFail,
+    setShowPassFail,
   } = useResultsViewStore();
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -87,6 +88,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) => {
                 />
               }
               label="Show full prompt in output cell"
+            />
+          </Tooltip>
+        </Box>
+        <Box>
+          <Tooltip title="Show pass/fail status for each output." placement="right">
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showPassFail}
+                  onChange={(e) => setShowPassFail(e.target.checked)}
+                />
+              }
+              label="Show pass/fail status"
             />
           </Tooltip>
         </Box>

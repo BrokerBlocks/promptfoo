@@ -1,8 +1,7 @@
 import { Command } from 'commander';
-import { eq } from 'drizzle-orm';
-
-import { getDb, evals } from '../database';
+import { eq, desc } from 'drizzle-orm';
 import fs from 'fs';
+import { getDb, evals } from '../database';
 import logger from '../logger';
 import telemetry from '../telemetry';
 
@@ -14,17 +13,33 @@ export function exportCommand(program: Command) {
     .action(async (evalId, cmdObj) => {
       try {
         const db = getDb();
-        const result = await db
-          .select({
-            id: evals.id,
-            createdAt: evals.createdAt,
-            description: evals.description,
-            results: evals.results,
-            config: evals.config,
-          })
-          .from(evals)
-          .where(eq(evals.id, evalId))
-          .execute();
+        let result;
+        if (evalId === 'latest') {
+          result = await db
+            .select({
+              id: evals.id,
+              createdAt: evals.createdAt,
+              description: evals.description,
+              results: evals.results,
+              config: evals.config,
+            })
+            .from(evals)
+            .orderBy(desc(evals.createdAt))
+            .limit(1)
+            .execute();
+        } else {
+          result = await db
+            .select({
+              id: evals.id,
+              createdAt: evals.createdAt,
+              description: evals.description,
+              results: evals.results,
+              config: evals.config,
+            })
+            .from(evals)
+            .where(eq(evals.id, evalId))
+            .execute();
+        }
 
         if (!result || result.length === 0) {
           logger.error(`No eval found with ID ${evalId}`);

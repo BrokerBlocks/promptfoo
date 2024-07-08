@@ -1,15 +1,13 @@
 import React from 'react';
-import { Metadata } from 'next';
-import { notFound } from 'next/navigation';
-import { cookies } from 'next/headers';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-
+import { EvaluateSummary, SharedResults, UnifiedConfig } from '@/../../../types';
 import { getApiBaseUrl } from '@/api';
 import { IS_RUNNING_LOCALLY } from '@/constants';
 import { getResult } from '@/database';
-import { EvaluateSummary, EvaluateTestSuite, SharedResults, UnifiedConfig } from '@/../../../types';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Metadata } from 'next';
+import { cookies } from 'next/headers';
+import { notFound } from 'next/navigation';
 import Eval from '../Eval';
-
 import './page.css';
 
 export const metadata: Metadata = {
@@ -58,6 +56,7 @@ export default async function Page({ params }: { params: { id: string } }) {
       data: {
         version: result.version,
         createdAt: result.createdAt,
+        author: 'Remote User',
         results: result.results as unknown as EvaluateSummary,
         config: result.config as unknown as UnifiedConfig,
       },

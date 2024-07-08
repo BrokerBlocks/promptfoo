@@ -1,14 +1,13 @@
 import * as fs from 'fs';
-import * as path from 'path';
 import glob from 'glob';
-
+import * as path from 'path';
 import {
   evaluate,
   renderPrompt,
   resolveVariables,
   generateVarCombinations,
+  isAllowedPrompt,
 } from '../src/evaluator';
-
 import type { ApiProvider, TestSuite, Prompt } from '../src/types';
 
 jest.mock('node-fetch', () => jest.fn());
@@ -71,7 +70,7 @@ describe('evaluator', () => {
     jest.clearAllMocks();
   });
 
-  test('evaluate with vars', async () => {
+  it('evaluate with vars', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [toPrompt('Test prompt {{ var1 }} {{ var2 }}')],
@@ -93,7 +92,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate with vars - no escaping', async () => {
+  it('evaluate with vars - no escaping', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [toPrompt('Test prompt {{ var1 }} {{ var2 }}')],
@@ -115,7 +114,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate with vars as object', async () => {
+  it('evaluate with vars as object', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [toPrompt('Test prompt {{ var1.prop1 }} {{ var2 }}')],
@@ -137,7 +136,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate with named prompt', async () => {
+  it('evaluate with named prompt', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [{ raw: 'Test prompt {{ var1 }} {{ var2 }}', label: 'test display name' }],
@@ -159,7 +158,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate with multiple vars', async () => {
+  it('evaluate with multiple vars', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [toPrompt('Test prompt {{ var1 }} {{ var2 }}')],
@@ -181,7 +180,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate with multiple providers', async () => {
+  it('evaluate with multiple providers', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider, mockApiProvider],
       prompts: [toPrompt('Test prompt {{ var1 }} {{ var2 }}')],
@@ -203,7 +202,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate without tests', async () => {
+  it('evaluate without tests', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [toPrompt('Test prompt')],
@@ -220,7 +219,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate without tests with multiple providers', async () => {
+  it('evaluate without tests with multiple providers', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider, mockApiProvider, mockApiProvider],
       prompts: [toPrompt('Test prompt')],
@@ -237,7 +236,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate with expected value matching output', async () => {
+  it('evaluate with expected value matching output', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [toPrompt('Test prompt')],
@@ -262,7 +261,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate with expected value not matching output', async () => {
+  it('evaluate with expected value not matching output', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [toPrompt('Test prompt')],
@@ -287,7 +286,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate with fn: expected value', async () => {
+  it('evaluate with fn: expected value', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [toPrompt('Test prompt')],
@@ -312,7 +311,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate with fn: expected value not matching output', async () => {
+  it('evaluate with fn: expected value not matching output', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [toPrompt('Test prompt')],
@@ -337,7 +336,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate with grading expected value', async () => {
+  it('evaluate with grading expected value', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [toPrompt('Test prompt')],
@@ -367,7 +366,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate with grading expected value does not pass', async () => {
+  it('evaluate with grading expected value does not pass', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [toPrompt('Test prompt')],
@@ -397,7 +396,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate with transform option - default test', async () => {
+  it('evaluate with transform option - default test', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [toPrompt('Test prompt')],
@@ -416,7 +415,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output postprocessed');
   });
 
-  test('evaluate with transform option - single test', async () => {
+  it('evaluate with transform option - single test', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [toPrompt('Test prompt')],
@@ -443,7 +442,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output postprocessed');
   });
 
-  test('evaluate with transform option - json provider', async () => {
+  it('evaluate with transform option - json provider', async () => {
     const mockApiJsonProvider: ApiProvider = {
       id: jest.fn().mockReturnValue('test-provider-json'),
       callApi: jest.fn().mockResolvedValue({
@@ -478,7 +477,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe(123);
   });
 
-  test('evaluate with provider transform', async () => {
+  it('evaluate with provider transform', async () => {
     const mockApiProviderWithTransform: ApiProvider = {
       id: jest.fn().mockReturnValue('test-provider-transform'),
       callApi: jest.fn().mockResolvedValue({
@@ -512,7 +511,7 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Transformed: Original output');
   });
 
-  test('evaluate with providerPromptMap', async () => {
+  it('evaluate with providerPromptMap', async () => {
     const testSuite: TestSuite = {
       providers: [mockApiProvider],
       prompts: [toPrompt('Test prompt 1'), toPrompt('Test prompt 2')],
@@ -537,7 +536,45 @@ describe('evaluator', () => {
     expect(summary.results[0].response?.output).toBe('Test output');
   });
 
-  test('evaluate with scenarios', async () => {
+  it('evaluate with allowed prompts filtering', async () => {
+    const mockApiProvider: ApiProvider = {
+      id: jest.fn().mockReturnValue('test-provider'),
+      callApi: jest.fn().mockResolvedValue({
+        output: 'Test output',
+        tokenUsage: { total: 10, prompt: 5, completion: 5, cached: 0 },
+      }),
+    };
+
+    const testSuite: TestSuite = {
+      providers: [mockApiProvider],
+      prompts: [
+        { raw: 'Test prompt 1', label: 'prompt1' },
+        { raw: 'Test prompt 2', label: 'prompt2' },
+        { raw: 'Test prompt 3', label: 'group1:prompt3' },
+      ],
+      providerPromptMap: {
+        'test-provider': ['prompt1', 'group1'],
+      },
+      tests: [
+        {
+          vars: { var1: 'value1', var2: 'value2' },
+        },
+      ],
+    };
+
+    const summary = await evaluate(testSuite, {});
+
+    expect(mockApiProvider.callApi).toHaveBeenCalledTimes(2);
+    expect(summary).toMatchObject({
+      stats: {
+        successes: 2,
+        failures: 0,
+      },
+      results: [{ prompt: { label: 'prompt1' } }, { prompt: { label: 'group1:prompt3' } }],
+    });
+  });
+
+  it('evaluate with scenarios', async () => {
     const mockApiProvider: ApiProvider = {
       id: jest.fn().mockReturnValue('test-provider'),
       callApi: jest
@@ -594,7 +631,7 @@ describe('evaluator', () => {
     expect(summary.results[1].response?.output).toBe('Bonjour le monde');
   });
 
-  test('evaluate with scenarios and multiple vars', async () => {
+  it('evaluate with scenarios and multiple vars', async () => {
     const mockApiProvider: ApiProvider = {
       id: jest.fn().mockReturnValue('test-provider'),
       callApi: jest
@@ -654,7 +691,7 @@ describe('evaluator', () => {
     expect(summary.results[3].response?.output).toBe('French Bonjour');
   });
 
-  test('evaluate with _conversation variable', async () => {
+  it('evaluate with _conversation variable', async () => {
     const mockApiProvider: ApiProvider = {
       id: jest.fn().mockReturnValue('test-provider'),
       callApi: jest.fn().mockImplementation((prompt) => {
@@ -688,7 +725,7 @@ describe('evaluator', () => {
   });
 });
 
-it('should use the options from the test if they exist', async () => {
+test('should use the options from the test if they exist', async () => {
   const testSuite: TestSuite = {
     providers: [mockApiProvider],
     prompts: [toPrompt('Test prompt')],
@@ -886,5 +923,41 @@ describe('generateVarCombinations', () => {
     const vars = {};
     const expected = [{}];
     expect(generateVarCombinations(vars)).toEqual(expected);
+  });
+});
+
+describe('isAllowedPrompt', () => {
+  const prompt1: Prompt = {
+    label: 'prompt1',
+    raw: '',
+  };
+  const prompt2: Prompt = {
+    label: 'group1:prompt2',
+    raw: '',
+  };
+  const prompt3: Prompt = {
+    label: 'group2:prompt3',
+    raw: '',
+  };
+
+  it('should return true if allowedPrompts is undefined', () => {
+    expect(isAllowedPrompt(prompt1, undefined)).toBe(true);
+  });
+
+  it('should return true if allowedPrompts includes the prompt label', () => {
+    expect(isAllowedPrompt(prompt1, ['prompt1', 'prompt2'])).toBe(true);
+  });
+
+  it('should return true if allowedPrompts includes a label that matches the start of the prompt label followed by a colon', () => {
+    expect(isAllowedPrompt(prompt2, ['group1'])).toBe(true);
+  });
+
+  it('should return false if allowedPrompts does not include the prompt label or any matching start label with a colon', () => {
+    expect(isAllowedPrompt(prompt3, ['group1', 'prompt2'])).toBe(false);
+  });
+
+  // TODO: What should the expected behavior of this test be?
+  it('should return false if allowedPrompts is an empty array', () => {
+    expect(isAllowedPrompt(prompt1, [])).toBe(false);
   });
 });

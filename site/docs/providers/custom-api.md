@@ -95,6 +95,40 @@ class CustomApiProvider {
 module.exports = CustomApiProvider;
 ```
 
+### Caching
+
+You can interact with promptfoo's cache by importing the `promptfoo.cache` module. For example:
+
+```js
+const promptfoo = require('../../dist/src/index.js').default;
+
+const cache = promptfoo.cache.getCache();
+await cache.set('foo', 'bar');
+console.log(await cache.get('foo')); // "bar"
+```
+
+The cache is managed by [`cache-manager`](https://www.npmjs.com/package/cache-manager/v/4.1.0).
+
+promptfoo also has built-in utility functions for fetching with cache and timeout:
+
+```js
+const { data, cached } = await promptfoo.cache.fetchWithCache(
+  'https://api.openai.com/v1/chat/completions',
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify(body),
+  },
+  10_000 /* 10 second timeout */,
+);
+
+console.log('Got from OpenAI:', data);
+console.log('Was it cached?', cached);
+```
+
 ## Using the provider
 
 Include the custom provider in promptfoo config:
@@ -105,7 +139,7 @@ providers: ['file://relative/path/to/customApiProvider.js']
 
 Alternatively, you can pass the path to the custom API provider directly in the CLI:
 
-```bash
+```
 promptfoo eval -p prompt1.txt prompt2.txt -o results.csv  -v vars.csv -r ./customApiProvider.js
 ```
 
